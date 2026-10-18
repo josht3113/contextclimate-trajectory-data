@@ -75,6 +75,10 @@ def main():
             cells += ["—"] * (len(c["points"]["500"]) - len(cells))
             lines.append(f"| {h} m | " + " | ".join(cells) + " |")
             report["cases"][name][h] = {"end": tr["end"], "rows": rows}
+            if os.environ.get("GITHUB_ACTIONS"):
+                detail = "; ".join(f"{r['age']}h {r['sep_km']:.0f}km ({r['pct']:.0f}%) ours {r['ours']} hy {r['hysplit']}"
+                                   for r in rows)
+                print(f"::notice title=validate {name} {h}m::{detail} [{tr['end']}]")
         lines.append("")
 
     md = "\n".join(lines)
