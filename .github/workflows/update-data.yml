@@ -37,8 +37,16 @@ jobs:
           key: tiles-${{ github.run_id }}
           restore-keys: tiles-
 
-      - name: Build tiles
-        run: python scripts/build_tiles.py --out data --budget-min 300
+      - name: Build wind tiles
+        run: python scripts/build_tiles.py --out data --budget-min 120
+
+      - name: Build city list
+        run: |
+          mkdir -p data/site
+          python scripts/cities.py --out data/site/cities.json --review /tmp/CITIES.md
+
+      - name: Compute trajectories
+        run: python scripts/compute_trajectories.py --data data --site data/site --store data/trajstore --budget-min 180
 
       - name: Save data window
         if: always() && hashFiles('data/state.json') != ''
@@ -49,12 +57,12 @@ jobs:
 
       - name: Add site files
         run: |
-          cp site/index.html data/index.html
-          touch data/.nojekyll
+          cp site/index.html data/site/index.html
+          touch data/site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: data
+          path: data/site
 
       - name: Keepalive
         if: always()

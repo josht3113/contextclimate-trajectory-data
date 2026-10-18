@@ -12,11 +12,13 @@ import math
 import os
 import subprocess
 import sys
+
+import numpy as np
 from datetime import timedelta
 
 sys.path.insert(0, os.path.dirname(__file__))
 import gfs_common as G  # noqa: E402
-from trajectory import TileStore, back_trajectory  # noqa: E402
+import batch_traj as BT  # noqa: E402
 
 HERE = os.path.dirname(__file__)
 
@@ -49,15 +51,19 @@ def main():
         need = [t0 - timedelta(hours=h) for h in range(0, args.hours + 4, 3)]
         work = os.path.join(args.work, name)
         subprocess.run([sys.executable, os.path.join(HERE, "build_tiles.py"), "--out", work,
-                        "--grids", "na", "--times", *[G.tkey(t) for t in need]], check=True)
-        store = TileStore(work)
+                        "--times", *[G.tkey(t) for t in need]], check=True)
+        with open(os.path.join(work, "manifest.json")) as f:
+            model = BT.Model(BT.Grids(work, json.load(f)))
         lines += [f"### {c['label']} — arrival {c['arrival']}Z", "",
                   "| Height | " + " | ".join(f"{p[0]} h" for p in c["points"]["500"]) + " |",
                   "|---|" + "---|" * len(c["points"]["500"])]
         report["cases"][name] = {}
         for h, refpts in c["points"].items():
-            tr = back_trajectory(store, c["lat"], c["lon"], t0, float(h), hours=args.hours)
-            ours = {p["h"]: p for p in tr["points"]}
+            r = BT.run(model, [c["lat"]], [c["lon"]], [float(h)], t0, hours=args.hours,
+                       members=BT.ENSEMBLE[:1])
+            ours = {-i: {"lat": v[0], "lon": v[1], "agl": v[2]} for i, v in enumerate(r["centre"][0])
+                    if not np.isnan(v[0])}
+            tr = {"end": "complete" if len(ours) == args.hours + 1 else "left domain"}
             cells, rows = [], []
             for age, la, lo, agl in refpts:
                 if age not in ours:
