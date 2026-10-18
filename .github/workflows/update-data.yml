@@ -1,0 +1,73 @@
+name: Update trajectory data
+
+# Runs ~3h50m after each GFS cycle (00/06/12/18Z), once f000-f024 are posted to AWS.
+on:
+  schedule:
+    - cron: "50 3,9,15,21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: write   # keepalive: re-enable this workflow so GitHub never auto-disables the schedule
+
+concurrency:
+  group: trajectory-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Restore data window
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: tiles-${{ github.run_id }}
+          restore-keys: tiles-
+
+      - name: Build tiles
+        run: python scripts/build_tiles.py --out data --budget-min 300
+
+      - name: Save data window
+        if: always() && hashFiles('data/state.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: tiles-${{ github.run_id }}
+
+      - name: Add site files
+        run: |
+          cp site/index.html data/index.html
+          touch data/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: data
+
+      - name: Keepalive
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update-data.yml/enable" || true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

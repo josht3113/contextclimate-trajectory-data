@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trajectory Data Status</title>
+<style>
+  :root { --bg:#1E2320; --card:#262B27; --ink:#E8E6DF; --dim:#9AA39C; --accent:#378ADD; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 "Public Sans", system-ui, sans-serif; }
+  main { max-width:640px; margin:40px auto; padding:0 16px; }
+  h1 { font:600 24px/1.2 "Zilla Slab", Georgia, serif; margin:0 0 16px; }
+  .card { background:var(--card); border-radius:10px; padding:16px 20px; }
+  dl { display:grid; grid-template-columns:max-content 1fr; gap:6px 18px; margin:0; }
+  dt { color:var(--dim); font:14px "Courier Prime", ui-monospace, monospace; }
+  dd { margin:0; }
+  .err { color:#E07A5F; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ContextClimate · Trajectory Data</h1>
+  <div class="card"><dl id="s"><dt>status</dt><dd>loading…</dd></dl></div>
+</main>
+<script>
+const fmt = k => `${k.slice(0,4)}-${k.slice(4,6)}-${k.slice(6,8)} ${k.slice(8,10)}Z`;
+fetch('manifest.json', {cache: 'no-store'}).then(r => r.json()).then(m => {
+  const an = m.times.filter(t => t.kind === 'analysis'), fc = m.times.filter(t => t.kind === 'forecast');
+  const rows = [
+    ['generated', m.generated.replace('T', ' ')],
+    ['latest cycle', m.latestCycle ? fmt(m.latestCycle) : '—'],
+    ['analysis', an.length ? `${fmt(an[0].t)} → ${fmt(an[an.length - 1].t)} (${an.length})` : '—'],
+    ['forecast', fc.length ? `→ ${fmt(fc[fc.length - 1].t)} (${fc.length})` : '—'],
+    ['levels', `${m.levels.length} (${m.levels[0]}–${m.levels[m.levels.length - 1]} hPa)`],
+    ['grids', Object.entries(m.grids).map(([k, g]) => `${k} ${g.res}°`).join(', ')],
+    ['size', `${(m.bytes / 1e6).toFixed(0)} MB`],
+    ['source', m.source],
+  ];
+  document.getElementById('s').innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+}).catch(e => { document.getElementById('s').innerHTML = `<dt>status</dt><dd class="err">${e}</dd>`; });
+</script>
+</body>
+</html>

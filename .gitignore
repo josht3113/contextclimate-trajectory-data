@@ -1,0 +1,4 @@
+data/
+validation_data/
+validation.json
+__pycache__/
