@@ -1,9 +1,11 @@
 name: Update trajectory data
 
-# Runs ~3h50m after each GFS cycle (00/06/12/18Z), once f000-f024 are posted to AWS.
+# Checks hourly; the full build runs only when a GFS cycle newer than the published one
+# has its f024 posted on AWS (or the published data is over 9 h old). GitHub's scheduler
+# delays and drops runs, so hourly checks publish each cycle within about an hour.
 on:
   schedule:
-    - cron: "50 3,9,15,21 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -17,7 +19,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/needs_update.py
+          sparse-checkout-cone-mode: false
+
+      - id: decide
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+        run: python3 scripts/needs_update.py
+
+      - name: Keepalive
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update-data.yml/enable" || true
+
   build:
+    needs: check
+    if: needs.check.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 340
     steps:
@@ -63,12 +89,6 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: data/site
-
-      - name: Keepalive
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update-data.yml/enable" || true
 
   deploy:
     needs: build
