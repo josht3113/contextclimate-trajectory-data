@@ -33,7 +33,7 @@ Source: NOAA Global Forecast System, NOAA Open Data Dissemination program (AWS).
 
 ## Workflows
 
-- **Update trajectory data** — every 6 h after each GFS cycle: restores the window from
+- **Update trajectory data** — checks hourly and builds when a new GFS cycle is fully posted on AWS (or the published data is over 9 h old; manual runs always build): restores the window from
   the Actions cache, downloads new GFS fields into wind tiles (kept in the cache, not
   published), recomputes arrivals whose data changed, deploys Pages.
 - **Validate against HYSPLIT** — manual: backfills three reference cases from the GFS
